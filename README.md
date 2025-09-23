@@ -1,58 +1,181 @@
-# Svelte library
+# SvelteFireAuth
 
-Everything you need to build a Svelte library, powered by [`sv`](https://npmjs.com/package/sv).
+一个基于 Firebase Auth REST API 的 Svelte 认证库，提供完整的用户认证功能，无需使用 Firebase 客户端 SDK。
 
-Read more about creating a library [in the docs](https://svelte.dev/docs/kit/packaging).
+## 特性
 
-## Creating a project
+- 🔥 **基于 Firebase Auth REST API** - 直接使用 REST API，无需客户端 SDK
+- 🚀 **SvelteKit 集成** - 一行代码集成到 SvelteKit 项目
+- 🍪 **Session Cookies** - 自动管理服务端会话
+- 🔒 **路由保护** - 灵活的页面级认证保护
+- 📱 **响应式状态** - 基于 Svelte stores 的响应式用户状态
+- 🛡️ **TypeScript 支持** - 完整的类型定义
+- 🎯 **现代设计** - 符合现代软件开发原则
 
-If you're seeing this, you've probably already done this step. Congrats!
+## 支持的认证操作
 
-```sh
-# create a new project in the current directory
-npx sv create
+- ✅ 邮箱注册
+- ✅ 邮箱密码登录
+- ✅ 邮箱验证
+- ✅ 密码重置
+- ✅ 密码找回
+- ✅ 修改资料
+- ✅ 获取用户资料
+- ✅ 删除账户
 
-# create a new project in my-app
-npx sv create my-app
+## 安装
+
+```bash
+npm install sveltefireauth
 ```
 
-## Developing
+## 快速开始
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+### 1. 配置 hooks.server.ts
 
-```sh
-npm run dev
+在 `src/hooks.server.ts` 中添加认证处理：
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+```typescript
+import { createAuthHook } from 'sveltefireauth';
+
+const firebaseConfig = {
+  apiKey: 'your-firebase-api-key',
+  projectId: 'your-project-id',
+  authDomain: 'your-project.firebaseapp.com'
+};
+
+export const handle = createAuthHook({
+  firebase: firebaseConfig,
+  middleware: {
+    protectedPaths: ['/dashboard', '/profile'],
+    loginPath: '/auth/signin',
+    redirectPath: '/dashboard'
+  }
+});
 ```
 
-Everything inside `src/lib` is part of your library, everything inside `src/routes` can be used as a showcase or preview app.
+### 2. 创建登录页面
 
-## Building
+```svelte
+<!-- src/routes/auth/signin/+page.svelte -->
+<script lang="ts">
+  import { signIn, authStore } from 'sveltefireauth';
 
-To build your library:
+  let email = '';
+  let password = '';
 
-```sh
-npm pack
+  async function handleSignIn() {
+    try {
+      await signIn(email, password, '/dashboard');
+    } catch (error) {
+      console.error('登录失败:', error);
+    }
+  }
+</script>
+
+<form on:submit|preventDefault={handleSignIn}>
+  <input bind:value={email} type="email" placeholder="邮箱" required />
+  <input bind:value={password} type="password" placeholder="密码" required />
+  <button type="submit" disabled={$authStore.loading}>
+    {$authStore.loading ? '登录中...' : '登录'}
+  </button>
+</form>
+
+{#if $authStore.error}
+  <p class="error">{$authStore.error}</p>
+{/if}
 ```
 
-To create a production version of your showcase app:
+### 3. 创建注册页面
 
-```sh
-npm run build
+```svelte
+<!-- src/routes/auth/signup/+page.svelte -->
+<script lang="ts">
+  import { signUp, authStore } from 'sveltefireauth';
+
+  let email = '';
+  let password = '';
+  let displayName = '';
+
+  async function handleSignUp() {
+    try {
+      await signUp(email, password, displayName, '/dashboard');
+    } catch (error) {
+      console.error('注册失败:', error);
+    }
+  }
+</script>
+
+<form on:submit|preventDefault={handleSignUp}>
+  <input bind:value={displayName} type="text" placeholder="显示名称" />
+  <input bind:value={email} type="email" placeholder="邮箱" required />
+  <input bind:value={password} type="password" placeholder="密码" required />
+  <button type="submit" disabled={$authStore.loading}>
+    {$authStore.loading ? '注册中...' : '注册'}
+  </button>
+</form>
 ```
 
-You can preview the production build with `npm run preview`.
+### 4. 保护页面
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+```typescript
+// src/routes/dashboard/+page.server.ts
+import { protectRoute } from 'sveltefireauth';
 
-## Publishing
-
-Go into the `package.json` and give your package the desired name through the `"name"` option. Also consider adding a `"license"` field and point it to a `LICENSE` file which you can create from a template (one popular option is the [MIT license](https://opensource.org/license/mit/)).
-
-To publish your library to [npm](https://www.npmjs.com):
-
-```sh
-npm publish
+export const load = protectRoute();
 ```
+
+### 5. 使用用户状态
+
+```svelte
+<!-- src/routes/dashboard/+page.svelte -->
+<script lang="ts">
+  import { authStore, signOut, updateProfile } from 'sveltefireauth';
+
+  async function handleSignOut() {
+    await signOut('/');
+  }
+
+  async function handleUpdateProfile() {
+    await updateProfile({
+      displayName: '新的显示名称'
+    });
+  }
+</script>
+
+{#if $authStore.authenticated}
+  <h1>欢迎, {$authStore.user?.displayName || $authStore.user?.email}!</h1>
+
+  <p>邮箱: {$authStore.user?.email}</p>
+  <p>邮箱验证状态: {$authStore.user?.emailVerified ? '已验证' : '未验证'}</p>
+
+  <button on:click={handleUpdateProfile}>更新资料</button>
+  <button on:click={handleSignOut}>登出</button>
+{/if}
+```
+
+## API 参考
+
+### 客户端函数
+
+- `signUp(email, password, displayName?, redirectTo?)` - 用户注册
+- `signIn(email, password, redirectTo?)` - 用户登录
+- `signOut(redirectTo?)` - 用户登出
+- `updateProfile(updates)` - 更新用户资料
+- `updateEmail(email)` - 更新邮箱
+- `updatePassword(password)` - 更新密码
+- `sendEmailVerification()` - 发送邮箱验证
+- `sendPasswordReset(email)` - 发送密码重置
+- `deleteAccount(redirectTo?)` - 删除账户
+
+### Stores
+
+- `authStore.user` - 当前用户信息
+- `authStore.authenticated` - 是否已认证
+- `authStore.loading` - 加载状态
+- `authStore.error` - 错误信息
+- `authStore.emailVerified` - 邮箱验证状态
+
+## 许可证
+
+MIT
