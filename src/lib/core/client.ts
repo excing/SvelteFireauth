@@ -229,9 +229,25 @@ export class FirebaseAuthClient {
   /**
    * 确认邮箱验证
    */
-  async confirmEmailVerification(request: ConfirmEmailVerificationRequest): Promise<UpdateAccountResponse> {
+  async confirmEmailVerification(oobCode: string): Promise<UpdateAccountResponse> {
     const url = this.buildUrl('update');
-    return this.request<UpdateAccountResponse>(url, 'POST', request);
+    return this.request<UpdateAccountResponse>(url, 'POST', { oobCode });
+  }
+
+  /**
+   * 检查操作代码
+   */
+  async checkActionCode(oobCode: string): Promise<{ data: { email: string; previousEmail?: string } }> {
+    const url = this.buildUrl('resetPassword');
+    return this.request(url, 'POST', { oobCode });
+  }
+
+  /**
+   * 使用邮箱链接登录
+   */
+  async signInWithEmailLink(oobCode: string): Promise<SignInResponse> {
+    const url = this.buildUrl('signInWithEmailLink');
+    return this.request<SignInResponse>(url, 'POST', { oobCode });
   }
 
   // ============================================================================

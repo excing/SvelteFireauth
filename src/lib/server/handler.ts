@@ -17,17 +17,23 @@ import type {
   SendPasswordResetRequest,
   ConfirmPasswordResetRequest,
   ConfirmEmailVerificationRequest,
-  FirebaseAuthError
+  FirebaseAuthError,
+  UserTransformer,
+  ResponseTransformer
 } from '../types/index.js';
 import { FirebaseAuthClient } from '../core/client.js';
-import { SessionManager } from './session.js';
+import type { SessionManager } from './session.js';
+import { createDefaultSessionManager } from './session.js';
 
 /**
  * 认证处理器配置
  */
 export interface AuthHandlerConfig {
   firebase: FirebaseConfig;
+  sessionManager?: SessionManager;
   session?: SessionCookieConfig;
+  userTransformer?: UserTransformer;
+  responseTransformer?: ResponseTransformer;
   cors?: {
     origin?: string | string[];
     credentials?: boolean;
@@ -58,7 +64,7 @@ export class AuthHandler {
   constructor(config: AuthHandlerConfig) {
     this.config = config;
     this.firebaseClient = new FirebaseAuthClient(config.firebase);
-    this.sessionManager = new SessionManager(config.firebase, config.session);
+    this.sessionManager = config.sessionManager || createDefaultSessionManager(config.session);
   }
 
   /**
@@ -126,7 +132,7 @@ export class AuthHandler {
 
     const response = await this.firebaseClient.signUp(body);
     const user = await this.createUserFromResponse(response);
-    const sessionCookie = this.sessionManager.createSessionCookie(user);
+    const sessionCookie = await this.sessionManager.createSession(user);
 
     headers.set('Set-Cookie', sessionCookie);
     return this.successResponse({ user }, headers);
@@ -144,7 +150,7 @@ export class AuthHandler {
 
     const response = await this.firebaseClient.signInWithPassword(body);
     const user = await this.createUserFromResponse(response);
-    const sessionCookie = this.sessionManager.createSessionCookie(user);
+    const sessionCookie = await this.sessionManager.createSession(user);
 
     headers.set('Set-Cookie', sessionCookie);
     return this.successResponse({ user }, headers);
@@ -154,7 +160,7 @@ export class AuthHandler {
    * 用户登出
    */
   private async handleSignOut(request: Request, headers: Headers): Promise<Response> {
-    const clearCookie = this.sessionManager.clearSessionCookie();
+    const clearCookie = await this.sessionManager.clearSession();
     headers.set('Set-Cookie', clearCookie);
     return this.successResponse({ message: 'Signed out successfully' }, headers);
   }
@@ -177,7 +183,7 @@ export class AuthHandler {
       expirationTime: Date.now() + parseInt(refreshResponse.expires_in) * 1000
     };
 
-    const sessionCookie = this.sessionManager.createSessionCookie(updatedUser);
+    const sessionCookie = await this.sessionManager.createSession(updatedUser);
     headers.set('Set-Cookie', sessionCookie);
     return this.successResponse({ user: updatedUser }, headers);
   }
@@ -211,7 +217,7 @@ export class AuthHandler {
 
     const response = await this.firebaseClient.updateProfile(updateRequest);
     const updatedUser = await this.createUserFromUpdateResponse(response, user);
-    const sessionCookie = this.sessionManager.createSessionCookie(updatedUser);
+    const sessionCookie = await this.sessionManager.createSession(updatedUser);
 
     headers.set('Set-Cookie', sessionCookie);
     return this.successResponse({ user: updatedUser }, headers);
@@ -238,7 +244,7 @@ export class AuthHandler {
 
     const response = await this.firebaseClient.updateEmail(updateRequest);
     const updatedUser = await this.createUserFromUpdateResponse(response, user);
-    const sessionCookie = this.sessionManager.createSessionCookie(updatedUser);
+    const sessionCookie = await this.sessionManager.createSession(updatedUser);
 
     headers.set('Set-Cookie', sessionCookie);
     return this.successResponse({ user: updatedUser }, headers);
@@ -265,7 +271,7 @@ export class AuthHandler {
 
     const response = await this.firebaseClient.updatePassword(updateRequest);
     const updatedUser = await this.createUserFromUpdateResponse(response, user);
-    const sessionCookie = this.sessionManager.createSessionCookie(updatedUser);
+    const sessionCookie = await this.sessionManager.createSession(updatedUser);
 
     headers.set('Set-Cookie', sessionCookie);
     return this.successResponse({ user: updatedUser }, headers);
@@ -329,7 +335,7 @@ export class AuthHandler {
       return this.errorResponse('MISSING_OOB_CODE', 'OOB code is required', 400, headers);
     }
 
-    await this.firebaseClient.confirmEmailVerification(body);
+    await this.firebaseClient.confirmEmailVerification(body.oobCode);
     return this.successResponse({ message: 'Email verification confirmed' }, headers);
   }
 
@@ -343,7 +349,7 @@ export class AuthHandler {
     }
 
     await this.firebaseClient.deleteAccount(user.accessToken);
-    const clearCookie = this.sessionManager.clearSessionCookie();
+    const clearCookie = await this.sessionManager.clearSession();
     headers.set('Set-Cookie', clearCookie);
     return this.successResponse({ message: 'Account deleted successfully' }, headers);
   }
@@ -361,7 +367,7 @@ export class AuthHandler {
       return null;
     }
 
-    return this.sessionManager.verifySessionCookie(cookieHeader);
+    return await this.sessionManager.verifySession(cookieHeader);
   }
 
   /**
@@ -371,7 +377,7 @@ export class AuthHandler {
     const accountInfo = await this.firebaseClient.getAccountInfo(response.idToken);
     const userInfo = accountInfo.users[0];
 
-    return {
+    let user: User = {
       uid: response.localId,
       email: response.email,
       displayName: response.displayName || userInfo.displayName,
@@ -385,13 +391,20 @@ export class AuthHandler {
       lastLoginAt: userInfo.lastLoginAt,
       isAnonymous: false
     };
+
+    // 应用用户数据转换器
+    if (this.config.userTransformer) {
+      user = await this.config.userTransformer(user);
+    }
+
+    return user;
   }
 
   /**
    * 从更新响应创建用户对象
    */
   private async createUserFromUpdateResponse(response: any, currentUser: User): Promise<User> {
-    return {
+    let user: User = {
       ...currentUser,
       email: response.email || currentUser.email,
       displayName: response.displayName || currentUser.displayName,
@@ -404,6 +417,13 @@ export class AuthHandler {
         ? Date.now() + parseInt(response.expiresIn) * 1000
         : currentUser.expirationTime
     };
+
+    // 应用用户数据转换器
+    if (this.config.userTransformer) {
+      user = await this.config.userTransformer(user);
+    }
+
+    return user;
   }
 
   /**

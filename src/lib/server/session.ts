@@ -1,27 +1,12 @@
 /**
- * 服务端会话管理
- * 处理 session cookies 的创建、验证和管理
+ * 服务端会话管理接口
+ * 允许外部实现自定义的会话管理策略
  */
 
-import type { 
-  User, 
-  SessionCookieConfig, 
-  FirebaseConfig,
-  FirebaseAuthError 
+import type {
+  User,
+  SessionCookieConfig
 } from '../types/index.js';
-import { FirebaseAuthClient } from '../core/client.js';
-
-/**
- * 默认会话 Cookie 配置
- */
-const DEFAULT_SESSION_CONFIG: Required<SessionCookieConfig> = {
-  name: '__session',
-  maxAge: 5 * 24 * 60 * 60, // 5 天
-  path: '/',
-  secure: true,
-  httpOnly: true,
-  sameSite: 'lax'
-};
 
 /**
  * 会话数据接口
@@ -39,25 +24,64 @@ interface SessionData {
 }
 
 /**
- * 会话管理器类
+ * 会话管理器接口
+ * 外部可以实现此接口来提供自定义的会话管理
  */
-export class SessionManager {
-  private config: Required<SessionCookieConfig>;
-  private firebaseClient: FirebaseAuthClient;
-
-  constructor(
-    firebaseConfig: FirebaseConfig,
-    sessionConfig?: SessionCookieConfig
-  ) {
-    this.config = { ...DEFAULT_SESSION_CONFIG, ...sessionConfig };
-    this.firebaseClient = new FirebaseAuthClient(firebaseConfig);
-  }
+export interface SessionManager {
+  /**
+   * 创建会话
+   * @param user 用户信息
+   * @returns 会话标识符或 cookie 字符串
+   */
+  createSession(user: User): Promise<string> | string;
 
   /**
-   * 创建会话 Cookie
+   * 验证会话
+   * @param sessionId 会话标识符
+   * @returns 用户信息，如果会话无效则返回 null
    */
-  createSessionCookie(user: User): string {
-    const sessionData: SessionData = {
+  verifySession(sessionId: string): Promise<User | null> | User | null;
+
+  /**
+   * 删除会话
+   * @param sessionId 会话标识符
+   * @returns 清除会话的 cookie 字符串或其他清除指令
+   */
+  clearSession(sessionId?: string): Promise<string> | string;
+
+  /**
+   * 刷新会话（可选）
+   * @param sessionId 当前会话标识符
+   * @returns 新的会话标识符
+   */
+  refreshSession?(sessionId: string): Promise<string> | string;
+}
+
+/**
+ * 默认会话 Cookie 配置
+ */
+export const DEFAULT_SESSION_CONFIG: Required<SessionCookieConfig> = {
+  name: '__session',
+  maxAge: 5 * 24 * 60 * 60, // 5 天
+  path: '/',
+  secure: true,
+  httpOnly: true,
+  sameSite: 'lax'
+};
+
+/**
+ * 默认的基于 Cookie 的会话管理器实现
+ * 这是一个简单的参考实现，生产环境建议使用更安全的方案
+ */
+export class DefaultCookieSessionManager implements SessionManager {
+  private config: Required<SessionCookieConfig>;
+
+  constructor(sessionConfig?: SessionCookieConfig) {
+    this.config = { ...DEFAULT_SESSION_CONFIG, ...sessionConfig };
+  }
+
+  createSession(user: User): string {
+    const sessionData = {
       uid: user.uid,
       email: user.email,
       emailVerified: user.emailVerified,
@@ -71,14 +95,11 @@ export class SessionManager {
 
     // 简单的 Base64 编码（生产环境应使用 JWT 或加密）
     const encodedData = Buffer.from(JSON.stringify(sessionData)).toString('base64');
-    
+
     return this.formatCookie(encodedData);
   }
 
-  /**
-   * 验证会话 Cookie
-   */
-  async verifySessionCookie(cookieValue: string): Promise<User | null> {
+  verifySession(cookieValue: string): User | null {
     try {
       // 解析 Cookie 值
       const sessionData = this.parseSessionData(cookieValue);
@@ -86,26 +107,8 @@ export class SessionManager {
         return null;
       }
 
-      // 检查是否过期
+      // 检查是否过期（简单检查，不刷新令牌）
       if (Date.now() > sessionData.expirationTime) {
-        // 尝试刷新令牌
-        try {
-          const refreshResponse = await this.firebaseClient.refreshToken(sessionData.refreshToken);
-          
-          // 更新会话数据
-          sessionData.accessToken = refreshResponse.id_token;
-          sessionData.refreshToken = refreshResponse.refresh_token;
-          sessionData.expirationTime = Date.now() + parseInt(refreshResponse.expires_in) * 1000;
-          
-          return this.sessionDataToUser(sessionData);
-        } catch {
-          return null;
-        }
-      }
-
-      // 验证访问令牌
-      const isValid = await this.firebaseClient.verifyIdToken(sessionData.accessToken);
-      if (!isValid) {
         return null;
       }
 
@@ -113,6 +116,10 @@ export class SessionManager {
     } catch {
       return null;
     }
+  }
+
+  clearSession(): string {
+    return `${this.config.name}=; Path=${this.config.path}; Max-Age=0; HttpOnly; SameSite=${this.config.sameSite}${this.config.secure ? '; Secure' : ''}`;
   }
 
   /**
@@ -188,31 +195,14 @@ export class SessionManager {
 }
 
 /**
- * 创建会话 Cookie（便捷函数）
+ * 便捷函数：创建默认的 Cookie 会话管理器
  */
-export function createSessionCookie(
-  user: User,
-  firebaseConfig: FirebaseConfig,
-  sessionConfig?: SessionCookieConfig
-): string {
-  const manager = new SessionManager(firebaseConfig, sessionConfig);
-  return manager.createSessionCookie(user);
+export function createDefaultSessionManager(sessionConfig?: SessionCookieConfig): SessionManager {
+  return new DefaultCookieSessionManager(sessionConfig);
 }
 
 /**
- * 验证会话 Cookie（便捷函数）
- */
-export async function verifySessionCookie(
-  cookieValue: string,
-  firebaseConfig: FirebaseConfig,
-  sessionConfig?: SessionCookieConfig
-): Promise<User | null> {
-  const manager = new SessionManager(firebaseConfig, sessionConfig);
-  return manager.verifySessionCookie(cookieValue);
-}
-
-/**
- * 清除会话 Cookie（便捷函数）
+ * 便捷函数：清除会话 Cookie
  */
 export function clearSessionCookie(sessionConfig?: SessionCookieConfig): string {
   const config = { ...DEFAULT_SESSION_CONFIG, ...sessionConfig };

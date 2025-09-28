@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0] - 2024-12-28
+
+### Added
+
+#### 高级功能
+- 🔧 **自定义会话管理** - 支持外部实现会话管理器（Redis、数据库等）
+- 🔄 **数据转换支持** - 用户数据和响应数据可以被调用者再加工
+- 🎨 **Action 页面处理** - 默认的 Firebase 自定义操作链接网址实现
+- 📚 **高级使用指南** - 详细的高级功能使用文档和示例
+
+#### 新增类型和接口
+- `SessionManager` 接口 - 自定义会话管理器接口
+- `UserTransformer` 和 `ResponseTransformer` - 数据转换器类型
+- `ActionPageHandler` - Firebase 操作页面处理器
+- `FirebaseActionMode` 和相关 Action 类型定义
+
+### Changed
+
+#### 架构改进
+- 🔧 **重构会话管理** - 从具体实现改为接口，提高灵活性
+- 🎯 **改进配置选项** - 更新 `AuthHandlerConfig` 和 `AuthHookConfig` 支持新功能
+- 📦 **重新组织导出** - 更清晰的模块导出结构
+
+#### 技术细节
+- 提供 `DefaultCookieSessionManager` 作为默认会话管理实现
+- 支持自定义 Action 页面模板和处理逻辑
+- 增强的错误处理和用户体验
+- 更完善的 TypeScript 类型支持
+
 ## [0.0.1] - 2024-01-01
 
 ### Added

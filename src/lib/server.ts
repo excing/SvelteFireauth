@@ -8,12 +8,19 @@ export type * from './types/index.js';
 export { FirebaseAuthClient } from './core/client.js';
 
 // 服务端功能
-export { createAuthHandler } from './server/handler.js';
-export { authMiddleware } from './server/middleware.js';
-export { createSessionCookie, verifySessionCookie } from './server/session.js';
+export { createAuthHandler, type AuthHandlerConfig } from './server/handler.js';
+export { authMiddleware, type AuthMiddlewareOptions } from './server/middleware.js';
+export {
+  type SessionManager,
+  DefaultCookieSessionManager,
+  createDefaultSessionManager,
+  clearSessionCookie,
+  DEFAULT_SESSION_CONFIG
+} from './server/session.js';
+export { ActionPageHandler, createActionPageHandler } from './server/action.js';
 
 // SvelteKit 集成
-export { createAuthHook } from './sveltekit/hooks.js';
+export { createAuthHook, createSimpleAuthHook, type AuthHookConfig } from './sveltekit/hooks.js';
 export { 
   protectRoute,
   protectVerifiedRoute,

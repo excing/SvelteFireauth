@@ -43,6 +43,21 @@ export interface User {
 export type AuthState = 'loading' | 'authenticated' | 'unauthenticated';
 
 /**
+ * 数据转换钩子类型
+ */
+export type DataTransformer<T, R = T> = (data: T) => R | Promise<R>;
+
+/**
+ * 用户数据转换钩子
+ */
+export type UserTransformer = DataTransformer<User>;
+
+/**
+ * API 响应数据转换钩子
+ */
+export type ResponseTransformer<T = any> = DataTransformer<T>;
+
+/**
  * 提供商用户信息
  */
 export interface ProviderUserInfo {
@@ -348,4 +363,64 @@ export interface AuthEvent {
   user?: User | null;
   data?: any;
   timestamp: number;
+}
+
+// ============================================================================
+// Firebase Action 页面相关类型
+// ============================================================================
+
+/**
+ * Firebase Action 模式
+ */
+export type FirebaseActionMode =
+  | 'resetPassword'      // 密码重置
+  | 'recoverEmail'       // 邮箱恢复
+  | 'verifyEmail'        // 邮箱验证
+  | 'signIn'             // 登录链接
+  | 'verifyAndChangeEmail'; // 验证并更改邮箱
+
+/**
+ * Action 页面参数
+ */
+export interface ActionPageParams {
+  /** 操作模式 */
+  mode: FirebaseActionMode;
+  /** 操作代码 */
+  oobCode: string;
+  /** API 密钥 */
+  apiKey?: string;
+  /** 继续 URL */
+  continueUrl?: string;
+  /** 语言代码 */
+  lang?: string;
+}
+
+/**
+ * Action 处理结果
+ */
+export interface ActionResult {
+  /** 是否成功 */
+  success: boolean;
+  /** 操作模式 */
+  mode: FirebaseActionMode;
+  /** 结果数据 */
+  data?: any;
+  /** 错误信息 */
+  error?: string;
+  /** 重定向 URL */
+  redirectUrl?: string;
+}
+
+/**
+ * Action 页面配置
+ */
+export interface ActionPageConfig {
+  /** 成功页面模板或 URL */
+  successPage?: string | ((result: ActionResult) => string);
+  /** 错误页面模板或 URL */
+  errorPage?: string | ((error: string, mode: FirebaseActionMode) => string);
+  /** 自定义处理器 */
+  customHandlers?: Partial<Record<FirebaseActionMode, (params: ActionPageParams) => Promise<ActionResult> | ActionResult>>;
+  /** 默认重定向 URL */
+  defaultRedirectUrl?: string;
 }

@@ -7,10 +7,15 @@ import type { Handle, RequestEvent } from '@sveltejs/kit';
 import type {
   FirebaseConfig,
   SessionCookieConfig,
-  AuthMiddlewareConfig
+  AuthMiddlewareConfig,
+  UserTransformer,
+  ResponseTransformer,
+  ActionPageConfig
 } from '../types/index.js';
 import { createAuthHandler, type AuthHandlerConfig } from '../server/handler.js';
 import { authMiddleware, type AuthMiddlewareOptions } from '../server/middleware.js';
+import { createActionPageHandler } from '../server/action.js';
+import type { SessionManager } from '../server/session.js';
 
 /**
  * 认证 Hook 配置
@@ -18,12 +23,22 @@ import { authMiddleware, type AuthMiddlewareOptions } from '../server/middleware
 export interface AuthHookConfig {
   /** Firebase 配置 */
   firebase: FirebaseConfig;
+  /** 自定义会话管理器 */
+  sessionManager?: SessionManager;
   /** 会话 Cookie 配置 */
   session?: SessionCookieConfig;
+  /** 用户数据转换器 */
+  userTransformer?: UserTransformer;
+  /** 响应数据转换器 */
+  responseTransformer?: ResponseTransformer;
   /** 中间件配置 */
   middleware?: AuthMiddlewareConfig;
   /** API 路径前缀，默认为 '/api/auth' */
   apiPrefix?: string;
+  /** Action 页面路径前缀，默认为 '/auth/action' */
+  actionPrefix?: string;
+  /** Action 页面配置 */
+  actionConfig?: ActionPageConfig;
   /** CORS 配置 */
   cors?: {
     origin?: string | string[];
@@ -36,18 +51,26 @@ export interface AuthHookConfig {
  */
 export function createAuthHook(config: AuthHookConfig): Handle {
   const apiPrefix = config.apiPrefix || '/api/auth';
+  const actionPrefix = config.actionPrefix || '/auth/action';
 
   // 创建认证处理器
   const authHandlerConfig: AuthHandlerConfig = {
     firebase: config.firebase,
+    sessionManager: config.sessionManager,
     session: config.session,
+    userTransformer: config.userTransformer,
+    responseTransformer: config.responseTransformer,
     cors: config.cors
   };
   const handleAuth = createAuthHandler(authHandlerConfig);
 
+  // 创建 Action 页面处理器
+  const handleAction = createActionPageHandler(config.firebase, config.actionConfig);
+
   // 创建认证中间件
   const middlewareOptions: AuthMiddlewareOptions = {
     firebase: config.firebase,
+    sessionManager: config.sessionManager,
     session: config.session,
     config: config.middleware
   };
@@ -60,6 +83,11 @@ export function createAuthHook(config: AuthHookConfig): Handle {
     // 检查是否为认证 API 请求
     if (url.pathname.startsWith(apiPrefix)) {
       return handleAuth(event, apiPrefix);
+    }
+
+    // 检查是否为 Action 页面请求
+    if (url.pathname.startsWith(actionPrefix)) {
+      return handleAction(event);
     }
 
     // 对于非 API 请求，应用认证中间件

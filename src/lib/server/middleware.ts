@@ -10,13 +10,15 @@ import type {
   AuthMiddlewareConfig, 
   User 
 } from '../types/index.js';
-import { SessionManager } from './session.js';
+import type { SessionManager } from './session.js';
+import { createDefaultSessionManager } from './session.js';
 
 /**
  * 认证中间件配置
  */
 export interface AuthMiddlewareOptions {
   firebase: FirebaseConfig;
+  sessionManager?: SessionManager;
   session?: SessionCookieConfig;
   config?: AuthMiddlewareConfig;
 }
@@ -40,7 +42,7 @@ export class AuthMiddleware {
   private config: Required<AuthMiddlewareConfig>;
 
   constructor(options: AuthMiddlewareOptions) {
-    this.sessionManager = new SessionManager(options.firebase, options.session);
+    this.sessionManager = options.sessionManager || createDefaultSessionManager(options.session);
     this.config = { ...DEFAULT_MIDDLEWARE_CONFIG, ...options.config };
   }
 
@@ -75,7 +77,7 @@ export class AuthMiddleware {
         return;
       }
 
-      const user = await this.sessionManager.verifySessionCookie(cookieHeader);
+      const user = await this.sessionManager.verifySession(cookieHeader);
       event.locals.user = user;
       event.locals.authenticated = !!user;
 

@@ -6,11 +6,13 @@
 
 - 🔥 **基于 Firebase Auth REST API** - 直接使用 REST API，无需客户端 SDK
 - 🚀 **SvelteKit 集成** - 一行代码集成到 SvelteKit 项目
-- 🍪 **Session Cookies** - 自动管理服务端会话
+- 🍪 **灵活的会话管理** - 支持自定义会话管理器（Redis、数据库等）
 - 🔒 **路由保护** - 灵活的页面级认证保护
 - 📱 **响应式状态** - 基于 Svelte stores 的响应式用户状态
 - 🛡️ **TypeScript 支持** - 完整的类型定义
 - 🎯 **现代设计** - 符合现代软件开发原则
+- 🎨 **自定义 Action 页面** - 美观的密码重置、邮箱验证页面
+- 🔄 **数据转换支持** - 可自定义用户数据和响应数据的处理
 
 ## 支持的认证操作
 
@@ -175,6 +177,66 @@ export const load = protectRoute();
 - `authStore.loading` - 加载状态
 - `authStore.error` - 错误信息
 - `authStore.emailVerified` - 邮箱验证状态
+
+## 高级功能
+
+### 自定义会话管理
+
+支持实现自定义的会话管理器，例如使用 Redis：
+
+```typescript
+import type { SessionManager } from 'sveltefireauth/server';
+
+class RedisSessionManager implements SessionManager {
+  async createSession(user: User): Promise<string> { /* ... */ }
+  async verifySession(sessionId: string): Promise<User | null> { /* ... */ }
+  async clearSession(): Promise<string> { /* ... */ }
+}
+
+export const handle = createAuthHook({
+  firebase: { /* ... */ },
+  sessionManager: new RedisSessionManager()
+});
+```
+
+### 数据转换
+
+支持自定义用户数据和响应数据的转换：
+
+```typescript
+export const handle = createAuthHook({
+  firebase: { /* ... */ },
+  userTransformer: async (user) => ({
+    ...user,
+    role: await getUserRole(user.uid),
+    permissions: await getUserPermissions(user.uid)
+  }),
+  responseTransformer: async (data) => {
+    // 移除敏感信息
+    const { accessToken, refreshToken, ...safeData } = data;
+    return safeData;
+  }
+});
+```
+
+### Action 页面
+
+支持自定义 Firebase 操作页面（密码重置、邮箱验证等）：
+
+```typescript
+export const handle = createAuthHook({
+  firebase: { /* ... */ },
+  actionConfig: {
+    successPage: (result) => `<html>...</html>`,
+    errorPage: (error, mode) => `<html>...</html>`,
+    customHandlers: {
+      resetPassword: async (params) => { /* 自定义逻辑 */ }
+    }
+  }
+});
+```
+
+详细的高级使用指南请参考 [examples/advanced-usage.md](examples/advanced-usage.md)。
 
 ## 许可证
 
