@@ -133,11 +133,172 @@ export const handle = createAuthHanle(apiKey);
 
 ### 3.2 `identity-platform.ts` (内部核心)
 
-`src/lib/identity-platform.ts` 是本库的核心, 它是一个封装了 Google Identity Platform REST API 的 TypeScript 类.
+`src/lib/identity-platform.ts` 是本库的核心, 它是一个封装了 Google Identity Platform REST API 的 TypeScript 类. 对于库的使用者来说, **通常不需要直接与 `IdentityPlatform` 类交互**. 后端的 REST API 和前端的辅助函数已经封装了其所有功能. 直接使用它适用于需要扩展库功能或进行更底层定制的高级场景.
 
-- **设计模式**: 它被实现为一个单例 (`Singleton`), 由服务器端的 `createAuthHanle` 进行实例化和管理. 这确保了在整个应用生命周期中, 只有一个 `IdentityPlatform` 实例存在, 避免了 API 密钥的重复加载和实例的滥用.
-- **主要职责**: 该类负责直接与 Google 的 API 端点进行通信, 处理请求的构造, 发送以及响应的解析.
-- **直接使用**: 对于库的使用者来说, **通常不需要直接与 `IdentityPlatform` 类交互**. 后端的 REST API 和前端的辅助函数已经封装了其所有功能. 直接使用它适用于需要扩展库功能或进行更底层定制的高级场景.
+#### 核心概念
+
+`IdentityPlatform` 是一个单例 (Singleton) 类, 这意味着在整个应用程序中只会有一个实例. 您需要通过 `IdentityPlatform.getInstance(apiKey)` 方法来获取这个实例. 在第一次调用时, 必须提供您的 Firebase 项目的 Web API 密钥.
+
+#### 初始化
+
+在使用 `IdentityPlatform` 的任何方法之前, 您必须先用您的 Firebase Web API 密钥初始化它.
+
+```typescript
+import IdentityPlatform from './identity-platform';
+
+// 在您的应用启动时, 例如在 Svelte 的 onMount 或顶层模块中
+const apiKey = 'YOUR_FIREBASE_WEB_API_KEY';
+const identityPlatform = IdentityPlatform.getInstance(apiKey);
+```
+
+#### 调用说明和示例
+
+一旦初始化完成, 您就可以使用 `identityPlatform` 实例来调用各种认证和用户管理方法.
+
+---
+
+##### 1. 用户注册 (邮箱和密码)
+
+使用 `signUpWithEmailPassword` 方法来创建一个新用户.
+
+**方法:**
+`signUpWithEmailPassword(email: string, password: string): Promise<AuthResponse | IdentityPlatformError>`
+
+**示例:**
+
+```typescript
+async function handleSignUp(email, password) {
+  try {
+    const response = await identityPlatform.signUpWithEmailPassword(email, password);
+
+    if ('error' in response) {
+      console.error('注册失败:', response.error.message);
+    } else {
+      console.log('注册成功:', response);
+      // response 包含 idToken, refreshToken, localId 等用户信息
+    }
+  } catch (e) {
+    console.error('发生意外错误:', e);
+  }
+}
+```
+
+---
+
+##### 2. 用户登录 (邮箱和密码)
+
+使用 `signInWithEmailPassword` 方法来登录现有用户.
+
+**方法:**
+`signInWithEmailPassword(email: string, password: string): Promise<AuthResponse | IdentityPlatformError>`
+
+**示例:**
+
+```typescript
+async function handleSignIn(email, password) {
+  try {
+    const response = await identityPlatform.signInWithEmailPassword(email, password);
+
+    if ('error' in response) {
+      console.error('登录失败:', response.error.message);
+    } else {
+      console.log('登录成功:', response);
+      // 登录成功后, 您应该安全地存储 idToken 和 refreshToken
+    } 
+  } catch (e) {
+    console.error('发生意外错误:', e);
+  }
+}
+```
+
+---
+
+##### 3. 获取用户数据
+
+用户登录后, 您可以使用 `idToken` 来获取用户的详细信息.
+
+**方法:**
+`getUserData(idToken: string): Promise<GetUserDataResponse | IdentityPlatformError>`
+
+**示例:**
+
+```typescript
+async function fetchUserData(idToken) {
+  try {
+    const response = await identityPlatform.getUserData(idToken);
+
+    if ('error' in response) {
+      console.error('获取用户信息失败:', response.error.message);
+    } else {
+      const user = response.users[0];
+      console.log('用户信息:', user);
+      // user 对象包含 email, displayName, photoUrl 等
+    }
+  } catch (e) {
+    console.error('发生意外错误:', e);
+  }
+}
+```
+
+---
+
+##### 4. 刷新 ID 令牌
+
+`idToken` 的有效期通常为 1 小时. 过期后, 您需要使用 `refreshToken` 来获取新的 `idToken`.
+
+**方法:**
+`refreshToken(refreshToken: string): Promise<RefreshTokenResponse | IdentityPlatformError>`
+
+**示例:**
+
+```typescript
+async function refreshUserToken(refreshToken) {
+  try {
+    const response = await identityPlatform.refreshToken(refreshToken);
+
+    if ('error' in response) {
+      console.error('刷新令牌失败:', response.error.message);
+    } else {
+      console.log('成功获取新令牌:', response);
+      // response.id_token 是新的 ID 令牌
+      // response.refresh_token 是新的刷新令牌
+    }
+  } catch (e) {
+    console.error('发生意外错误:', e);
+  }
+}
+```
+
+---
+
+##### 5. 发送密码重置邮件
+
+如果用户忘记密码, 您可以调用此方法向其注册邮箱发送一封密码重置邮件.
+
+**方法:**
+`sendPasswordResetEmail(email: string): Promise<{ email: string } | IdentityPlatformError>`
+
+**示例:**
+
+```typescript
+async function handlePasswordReset(email) {
+  try {
+    const response = await identityPlatform.sendPasswordResetEmail(email);
+
+    if ('error' in response) {
+      console.error('发送邮件失败:', response.error.message);
+    } else {
+      console.log('密码重置邮件已发送至:', response.email);
+    }
+  } catch (e) {
+    console.error('发生意外错误:', e);
+  }
+}
+```
+
+#### 错误处理
+
+所有 API 方法都可能返回一个 `IdentityPlatformError` 对象. 在调用任何方法后, 您都应该检查返回的对象中是否包含 `error` 字段, 以便正确处理 API 返回的错误.
 
 ## 开发
 
