@@ -1,6 +1,6 @@
 {
 	"name": "sveltefireauth",
-	"version": "0.0.1",
+	"version": "0.0.5",
 	"description": "Firebase Authentication library for SvelteKit with server-side API proxy and client-side state management",
 	"author": "Your Name",
 	"license": "MIT",
