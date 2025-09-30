@@ -16,70 +16,78 @@
 npm install sveltefireauth
 ```
 
-## 如何使用
+## 快速入门
 
-首先，您需要在您的项目中初始化 `IdentityPlatform` 实例。建议在项目的根布局文件（例如 `src/routes/+layout.svelte`）中进行初始化。
+`SvelteFireAuth` 提供了一个 SvelteKit `Handle` 来快速为您的应用后端集成用户认证 REST API.
 
-**1. 初始化**
+**1. 设置环境变量**
 
-您需要从 Google Cloud 控制台获取您的 Web API 密钥。
+首先, 在您的项目根目录下创建一个 `.env` 文件, 并添加您的 Firebase 项目 Web API 密钥.
+
+```bash
+# .env
+FIREBASE_API_KEY="your-firebase-web-api-key"
+```
+
+**2. 创建服务器钩子 (Hook)**
+
+在 `src/hooks.server.ts` 文件中, 导入 `createAuthHanle` 并使用您的 API 密钥创建 handle.
 
 ```typescript
-// src/lib/identity-platform.ts
-import IdentityPlatform from './identity-platform';
+// src/hooks.server.ts
+import { createAuthHanle } from 'sveltefireauth/server'; // 假设包名为 sveltefireauth
+import { env } from '$env/dynamic/private';
 
-const apiKey = 'YOUR_API_KEY'; // 替换为您的 API 密钥
-const identityPlatform = IdentityPlatform.getInstance(apiKey);
+// 从环境变量中安全地获取你的 API Key
+const apiKey = env.FIREBASE_API_KEY;
 
-export default identityPlatform;
+// 创建并导出 handle
+export const handle = createAuthHanle(apiKey);
 ```
 
-**2. 用户注册示例**
+**3. 完成!**
 
-现在您可以在您的 Svelte 组件中导入并使用它。
+现在, 您的 SvelteKit 应用已经拥有了一套完整的用户认证 REST API. 您可以在前端通过 `fetch` 调用这些接口.
 
-```svelte
-<script lang="ts">
-  import identityPlatform from '../lib/identity-platform';
+## API 端点
 
-  let email = '';
-  let password = '';
-  let message = '';
+`createAuthHanle` 会自动创建以下 API 端点, 所有端点都位于 `/api/auth/` 路径下, 并使用 `POST` 方法.
 
-  async function handleSignUp() {
-    const response = await identityPlatform.signUpWithEmailPassword(email, password);
+| 端点 Action                 | 描述                               | 请求体 Body 参数                                   |
+| --------------------------- | ---------------------------------- | -------------------------------------------------- |
+| `signUpWithEmailPassword`   | 使用邮箱和密码注册新用户         | `{ "email", "password" }`                          |
+| `signInWithEmailPassword`   | 使用邮箱和密码登录               | `{ "email", "password" }`                          |
+| `signInAnonymously`         | 匿名登录                         | `{}`                                               |
+| `refreshToken`              | 刷新用户的 ID 令牌               | `{ "refreshToken" }`                               |
+| `sendPasswordResetEmail`    | 发送密码重置邮件                 | `{ "email" }`                                      |
+| `confirmPasswordReset`      | 确认密码重置                     | `{ "oobCode", "newPassword" }`                     |
+| `getUserData`               | 获取用户信息                     | `{ "idToken" }`                                    |
+| `updateProfile`             | 更新用户个人资料                 | `{ "idToken", "displayName"?, "photoUrl"? }`       |
+| `changeEmail`               | 更改用户邮箱                     | `{ "idToken", "email" }`                           |
+| `changePassword`            | 更改用户密码                     | `{ "idToken", "password" }`                        |
+| `sendEmailVerification`     | 发送邮箱验证邮件                 | `{ "idToken" }`                                    |
+| `confirmEmailVerification`  | 确认邮箱验证                     | `{ "oobCode" }`                                    |
+| `deleteAccount`             | 删除用户账户                     | `{ "idToken" }`                                    |
 
-    if ('error' in response) {
-      message = `注册失败: ${response.error.message}`;
-    } else {
-      message = '注册成功！';
-      console.log(response);
-    }
+**前端调用示例:**
+
+```javascript
+// 在你的 Svelte 组件中
+async function signUp() {
+  const response = await fetch('/api/auth/signUpWithEmailPassword', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'user@example.com', password: 'secretpassword' })
+  });
+  const data = await response.json();
+  
+  if (response.ok) {
+    console.log('注册成功:', data);
+  } else {
+    console.error('注册失败:', data.error.message);
   }
-</script>
-
-<main>
-  <h1>用户注册</h1>
-  <input type="email" bind:value={email} placeholder="电子邮件" />
-  <input type="password" bind:value={password} placeholder="密码" />
-  <button on:click={handleSignUp}>注册</button>
-  <p>{message}</p>
-</main>
+}
 ```
-
-## API 参考
-
-`IdentityPlatform` 类提供了多种与用户认证相关的方法。以下是一些常用方法的列表：
-
-- `signUpWithEmailPassword(email, password)`: 使用邮箱和密码注册新用户。
-- `signInWithEmailPassword(email, password)`: 使用邮箱和密码登录。
-- `sendPasswordResetEmail(email)`: 发送密码重置邮件。
-- `changePassword(idToken, newPassword)`: 更改用户密码。
-- `updateProfile(idToken, { displayName, photoUrl })`: 更新用户个人资料。
-- `getUserData(idToken)`: 获取用户信息。
-- `deleteAccount(idToken)`: 删除用户账户。
-
-更多方法和详细信息，请直接参考 `src/lib/identity-platform.ts` 文件中的源代码和注释。
 
 ## 开发
 
