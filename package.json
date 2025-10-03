@@ -1,12 +1,12 @@
 {
 	"name": "sveltefireauth",
-	"version": "0.0.5",
+	"version": "0.0.6",
 	"description": "Firebase Authentication library for SvelteKit with server-side API proxy and client-side state management",
-	"author": "Your Name",
+	"author": "excing",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/yourusername/sveltefireauth"
+		"url": "git+https://github.com/excing/sveltefireauth.git"
 	},
 	"scripts": {
 		"dev": "vite dev",

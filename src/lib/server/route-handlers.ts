@@ -2,27 +2,57 @@
  * SvelteKit route handlers for Firebase Auth
  */
 
-import { json, type RequestHandler } from '@sveltejs/kit';
+import { json, type RequestHandler, type RequestEvent } from '@sveltejs/kit';
 import type { RouteHandlerConfig } from './types.js';
 import * as authHandler from './auth-handler.js';
 import { parseFirebaseError } from '../shared/utils.js';
 
-/**
- * Create a sign up handler
- */
-export function handleSignUp(config: RouteHandlerConfig): RequestHandler {
-	return async ({ request }) => {
-		try {
-			const { email, password } = await request.json();
+type RequestParams = Record<string, any>;
 
-			if (!email || !password) {
-				return json(
-					{ error: { code: 'INVALID_REQUEST', message: 'Email and password are required' } },
-					{ status: 400 }
-				);
+type AuthHandler = (apiKey: string, ...args: any[]) => Promise<any>;
+
+interface RequestHandlerOptions {
+	handler: AuthHandler;
+	body?: (keyof RequestParams)[];
+	token?: boolean;
+	params?: (keyof RequestParams)[];
+}
+
+function createRequestHandler(
+	config: RouteHandlerConfig,
+	options: RequestHandlerOptions
+): RequestHandler {
+	return async ({ request }: RequestEvent) => {
+		try {
+			const params: RequestParams = {};
+
+			if (options.body) {
+				const body = await request.json();
+				for (const key of options.body) {
+					if (!(key in body)) {
+						return json(
+							{ error: { code: 'INVALID_REQUEST', message: `${String(key)} is required` } },
+							{ status: 400 }
+						);
+					}
+					params[key] = body[key];
+				}
 			}
 
-			const result = await authHandler.signUp(config.firebaseApiKey, email, password);
+			if (options.token) {
+				const authHeader = request.headers.get('Authorization');
+				const idToken = authHeader?.replace('Bearer ', '');
+				if (!idToken) {
+					return json(
+						{ error: { code: 'INVALID_REQUEST', message: 'Authorization token is required' } },
+						{ status: 401 }
+					);
+				}
+				params['idToken'] = idToken;
+			}
+
+			const handlerArgs = (options.params || []).map((key) => params[key]);
+			const result = await options.handler(config.firebaseApiKey, ...handlerArgs);
 
 			const responseData = config.responseTransformer ? config.responseTransformer(result) : result;
 
@@ -35,30 +65,25 @@ export function handleSignUp(config: RouteHandlerConfig): RequestHandler {
 }
 
 /**
+ * Create a sign up handler
+ */
+export function handleSignUp(config: RouteHandlerConfig): RequestHandler {
+	return createRequestHandler(config, {
+		handler: authHandler.signUp,
+		body: ['email', 'password'],
+		params: ['email', 'password']
+	});
+}
+
+/**
  * Create a sign in handler
  */
 export function handleSignIn(config: RouteHandlerConfig): RequestHandler {
-	return async ({ request }) => {
-		try {
-			const { email, password } = await request.json();
-
-			if (!email || !password) {
-				return json(
-					{ error: { code: 'INVALID_REQUEST', message: 'Email and password are required' } },
-					{ status: 400 }
-				);
-			}
-
-			const result = await authHandler.signIn(config.firebaseApiKey, email, password);
-
-			const responseData = config.responseTransformer ? config.responseTransformer(result) : result;
-
-			return json(responseData);
-		} catch (error) {
-			const authError = parseFirebaseError(error);
-			return json({ error: authError }, { status: 400 });
-		}
-	};
+	return createRequestHandler(config, {
+		handler: authHandler.signIn,
+		body: ['email', 'password'],
+		params: ['email', 'password']
+	});
 }
 
 /**
@@ -76,228 +101,88 @@ export function handleSignOut(config: RouteHandlerConfig): RequestHandler {
  * Create a refresh token handler
  */
 export function handleRefreshToken(config: RouteHandlerConfig): RequestHandler {
-	return async ({ request }) => {
-		try {
-			const { refreshToken } = await request.json();
-
-			if (!refreshToken) {
-				return json(
-					{ error: { code: 'INVALID_REQUEST', message: 'Refresh token is required' } },
-					{ status: 400 }
-				);
-			}
-
-			const result = await authHandler.refreshToken(config.firebaseApiKey, refreshToken);
-
-			const responseData = config.responseTransformer ? config.responseTransformer(result) : result;
-
-			return json(responseData);
-		} catch (error) {
-			const authError = parseFirebaseError(error);
-			return json({ error: authError }, { status: 400 });
-		}
-	};
+	return createRequestHandler(config, {
+		handler: authHandler.refreshToken,
+		body: ['refreshToken'],
+		params: ['refreshToken']
+	});
 }
 
 /**
  * Create a get user handler
  */
 export function handleGetUser(config: RouteHandlerConfig): RequestHandler {
-	return async ({ request }) => {
-		try {
-			const authHeader = request.headers.get('Authorization');
-			const idToken = authHeader?.replace('Bearer ', '');
-
-			if (!idToken) {
-				return json(
-					{ error: { code: 'INVALID_REQUEST', message: 'Authorization token is required' } },
-					{ status: 401 }
-				);
-			}
-
-			const result = await authHandler.getUser(config.firebaseApiKey, idToken);
-
-			const responseData = config.responseTransformer ? config.responseTransformer(result) : result;
-
-			return json(responseData);
-		} catch (error) {
-			const authError = parseFirebaseError(error);
-			return json({ error: authError }, { status: 400 });
-		}
-	};
+	return createRequestHandler(config, {
+		handler: authHandler.getUser,
+		token: true,
+		params: ['idToken']
+	});
 }
 
 /**
  * Create an update user handler
  */
 export function handleUpdateUser(config: RouteHandlerConfig): RequestHandler {
-	return async ({ request }) => {
-		try {
-			const authHeader = request.headers.get('Authorization');
-			const idToken = authHeader?.replace('Bearer ', '');
-
-			if (!idToken) {
-				return json(
-					{ error: { code: 'INVALID_REQUEST', message: 'Authorization token is required' } },
-					{ status: 401 }
-				);
-			}
-
-			const { displayName, photoUrl } = await request.json();
-
-			const result = await authHandler.updateProfile(
-				config.firebaseApiKey,
-				idToken,
-				displayName,
-				photoUrl
-			);
-
-			const responseData = config.responseTransformer ? config.responseTransformer(result) : result;
-
-			return json(responseData);
-		} catch (error) {
-			const authError = parseFirebaseError(error);
-			return json({ error: authError }, { status: 400 });
-		}
-	};
+	return createRequestHandler(config, {
+		handler: authHandler.updateProfile,
+		body: ['displayName', 'photoUrl'],
+		token: true,
+		params: ['idToken', 'displayName', 'photoUrl']
+	});
 }
 
 /**
  * Create a delete user handler
  */
 export function handleDeleteUser(config: RouteHandlerConfig): RequestHandler {
-	return async ({ request }) => {
-		try {
-			const authHeader = request.headers.get('Authorization');
-			const idToken = authHeader?.replace('Bearer ', '');
-
-			if (!idToken) {
-				return json(
-					{ error: { code: 'INVALID_REQUEST', message: 'Authorization token is required' } },
-					{ status: 401 }
-				);
-			}
-
-			await authHandler.deleteAccount(config.firebaseApiKey, idToken);
-
-			return json({ success: true });
-		} catch (error) {
-			const authError = parseFirebaseError(error);
-			return json({ error: authError }, { status: 400 });
-		}
-	};
+	return createRequestHandler(config, {
+		handler: authHandler.deleteAccount,
+		token: true,
+		params: ['idToken']
+	});
 }
 
 /**
  * Create a password reset handler
  */
 export function handlePasswordReset(config: RouteHandlerConfig): RequestHandler {
-	return async ({ request }) => {
-		try {
-			const { email } = await request.json();
-
-			if (!email) {
-				return json(
-					{ error: { code: 'INVALID_REQUEST', message: 'Email is required' } },
-					{ status: 400 }
-				);
-			}
-
-			const result = await authHandler.sendPasswordResetEmail(config.firebaseApiKey, email);
-
-			const responseData = config.responseTransformer ? config.responseTransformer(result) : result;
-
-			return json(responseData);
-		} catch (error) {
-			const authError = parseFirebaseError(error);
-			return json({ error: authError }, { status: 400 });
-		}
-	};
+	return createRequestHandler(config, {
+		handler: authHandler.sendPasswordResetEmail,
+		body: ['email'],
+		params: ['email']
+	});
 }
 
 /**
  * Create a password confirm handler
  */
 export function handlePasswordConfirm(config: RouteHandlerConfig): RequestHandler {
-	return async ({ request }) => {
-		try {
-			const { oobCode, newPassword } = await request.json();
-
-			if (!oobCode || !newPassword) {
-				return json(
-					{ error: { code: 'INVALID_REQUEST', message: 'OOB code and new password are required' } },
-					{ status: 400 }
-				);
-			}
-
-			const result = await authHandler.confirmPasswordReset(
-				config.firebaseApiKey,
-				oobCode,
-				newPassword
-			);
-
-			const responseData = config.responseTransformer ? config.responseTransformer(result) : result;
-
-			return json(responseData);
-		} catch (error) {
-			const authError = parseFirebaseError(error);
-			return json({ error: authError }, { status: 400 });
-		}
-	};
+	return createRequestHandler(config, {
+		handler: authHandler.confirmPasswordReset,
+		body: ['oobCode', 'newPassword'],
+		params: ['oobCode', 'newPassword']
+	});
 }
 
 /**
  * Create an email verification handler
  */
 export function handleVerifyEmail(config: RouteHandlerConfig): RequestHandler {
-	return async ({ request }) => {
-		try {
-			const authHeader = request.headers.get('Authorization');
-			const idToken = authHeader?.replace('Bearer ', '');
-
-			if (!idToken) {
-				return json(
-					{ error: { code: 'INVALID_REQUEST', message: 'Authorization token is required' } },
-					{ status: 401 }
-				);
-			}
-
-			const result = await authHandler.sendEmailVerification(config.firebaseApiKey, idToken);
-
-			const responseData = config.responseTransformer ? config.responseTransformer(result) : result;
-
-			return json(responseData);
-		} catch (error) {
-			const authError = parseFirebaseError(error);
-			return json({ error: authError }, { status: 400 });
-		}
-	};
+	return createRequestHandler(config, {
+		handler: authHandler.sendEmailVerification,
+		token: true,
+		params: ['idToken']
+	});
 }
 
 /**
  * Create an email verification confirm handler
  */
 export function handleVerifyEmailConfirm(config: RouteHandlerConfig): RequestHandler {
-	return async ({ request }) => {
-		try {
-			const { oobCode } = await request.json();
-
-			if (!oobCode) {
-				return json(
-					{ error: { code: 'INVALID_REQUEST', message: 'OOB code is required' } },
-					{ status: 400 }
-				);
-			}
-
-			const result = await authHandler.confirmEmailVerification(config.firebaseApiKey, oobCode);
-
-			const responseData = config.responseTransformer ? config.responseTransformer(result) : result;
-
-			return json(responseData);
-		} catch (error) {
-			const authError = parseFirebaseError(error);
-			return json({ error: authError }, { status: 400 });
-		}
-	};
+	return createRequestHandler(config, {
+		handler: authHandler.confirmEmailVerification,
+		body: ['oobCode'],
+		params: ['oobCode']
+	});
 }
 

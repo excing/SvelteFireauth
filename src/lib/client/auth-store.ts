@@ -48,6 +48,16 @@ function createAuthStore() {
 		if (storeConfig.autoRefresh) {
 			setupAutoRefresh();
 		}
+
+		// Cleanup on page unload
+		if (typeof window !== 'undefined') {
+			const cleanup = () => {
+				if (refreshInterval) {
+					clearInterval(refreshInterval);
+				}
+			};
+			window.addEventListener('beforeunload', cleanup);
+		}
 	}
 
 	/**
@@ -63,27 +73,28 @@ function createAuthStore() {
 			const storedExpiresAt = localStorage.getItem(STORAGE_KEYS.EXPIRES_AT);
 
 			if (storedData && storedIdToken && storedRefreshToken && storedExpiresAt) {
-				const user = safeJsonParse<User>(storedData, null as any);
+				const user = safeJsonParse<User | null>(storedData, null);
+				if (!user) return;
+
 				currentIdToken = storedIdToken;
 				currentRefreshToken = storedRefreshToken;
 				expiresAt = parseInt(storedExpiresAt, 10);
 
-				if (user) {
-					state.set({
-						user,
-						loading: false,
-						error: null,
-						isAuthenticated: true
-					});
+				state.set({
+					user,
+					loading: false,
+					error: null,
+					isAuthenticated: true
+				});
 
-					// Check if token needs refresh
-					if (willTokenExpireSoon(expiresAt)) {
-						refreshTokens();
-					}
+				// Check if token needs refresh
+				if (willTokenExpireSoon(expiresAt)) {
+					refreshTokens();
 				}
 			}
 		} catch (error) {
 			console.error('Failed to load persisted auth state:', error);
+			clearPersistedState();
 		}
 	}
 

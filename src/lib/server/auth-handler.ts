@@ -29,12 +29,11 @@ import { FIREBASE_ENDPOINTS } from '../shared/constants.js';
  */
 async function firebaseRequest<T>(
 	url: string,
-	method: string = 'POST',
-	body?: any
+	body?: unknown
 ): Promise<T> {
 	try {
 		const response = await fetch(url, {
-			method,
+			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json'
 			},
@@ -71,7 +70,7 @@ export async function signUp(
 		returnSecureToken: true
 	};
 
-	return firebaseRequest<SignUpResponse>(url, 'POST', body);
+	return firebaseRequest<SignUpResponse>(url, body);
 }
 
 /**
@@ -89,7 +88,7 @@ export async function signIn(
 		returnSecureToken: true
 	};
 
-	return firebaseRequest<SignInResponse>(url, 'POST', body);
+	return firebaseRequest<SignInResponse>(url, body);
 }
 
 /**
@@ -105,7 +104,7 @@ export async function refreshToken(
 		refresh_token: refreshToken
 	};
 
-	return firebaseRequest<RefreshTokenResponse>(url, 'POST', body);
+	return firebaseRequest<RefreshTokenResponse>(url, body);
 }
 
 /**
@@ -117,7 +116,7 @@ export async function getUser(apiKey: string, idToken: string): Promise<GetUserR
 		idToken
 	};
 
-	return firebaseRequest<GetUserResponse>(url, 'POST', body);
+	return firebaseRequest<GetUserResponse>(url, body);
 }
 
 /**
@@ -137,7 +136,7 @@ export async function updateProfile(
 		returnSecureToken: true
 	};
 
-	return firebaseRequest<UpdateProfileResponse>(url, 'POST', body);
+	return firebaseRequest<UpdateProfileResponse>(url, body);
 }
 
 /**
@@ -149,7 +148,7 @@ export async function deleteAccount(apiKey: string, idToken: string): Promise<vo
 		idToken
 	};
 
-	await firebaseRequest<any>(url, 'POST', body);
+	await firebaseRequest<unknown>(url, body);
 }
 
 /**
@@ -165,7 +164,7 @@ export async function sendPasswordResetEmail(
 		email
 	};
 
-	return firebaseRequest<SendPasswordResetEmailResponse>(url, 'POST', body);
+	return firebaseRequest<SendPasswordResetEmailResponse>(url, body);
 }
 
 /**
@@ -182,7 +181,7 @@ export async function confirmPasswordReset(
 		newPassword
 	};
 
-	return firebaseRequest<ConfirmPasswordResetResponse>(url, 'POST', body);
+	return firebaseRequest<ConfirmPasswordResetResponse>(url, body);
 }
 
 /**
@@ -198,7 +197,7 @@ export async function sendEmailVerification(
 		idToken
 	};
 
-	return firebaseRequest<SendEmailVerificationResponse>(url, 'POST', body);
+	return firebaseRequest<SendEmailVerificationResponse>(url, body);
 }
 
 /**
@@ -213,6 +212,6 @@ export async function confirmEmailVerification(
 		oobCode
 	};
 
-	return firebaseRequest<UpdateProfileResponse>(url, 'POST', body);
+	return firebaseRequest<UpdateProfileResponse>(url, body);
 }
 
