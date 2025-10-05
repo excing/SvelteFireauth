@@ -25,9 +25,22 @@ export interface AuthHandleConfig {
 	apiPath?: string;
 	enableCallback?: boolean;
 	callbackPath?: string;
+	callbackConfig?: AuthCallbackConfig;
 	enableSession?: boolean;
 	sessionConfig?: SessionConfig;
 	responseTransformer?: ResponseTransformer;
+}
+
+/**
+ * Auth callback configuration
+ */
+export interface AuthCallbackConfig {
+	firebaseApiKey: string;
+	successUrl?: string;
+	errorUrl?: string;
+	resetPasswordUrl?: string;
+	recoverEmailUrl?: string;
+	verifyEmailUrl?: string;
 }
 
 /**

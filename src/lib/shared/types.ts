@@ -203,6 +203,22 @@ export interface ConfirmEmailVerificationRequest {
 }
 
 /**
+ * Verify OOB code request
+ */
+export interface VerifyOobCodeRequest {
+	oobCode: string;
+}
+
+/**
+ * Verify OOB code response
+ */
+export interface VerifyOobCodeResponse {
+	email: string;
+	requestType: 'PASSWORD_RESET' | 'VERIFY_EMAIL' | 'RECOVER_EMAIL';
+	newEmail?: string;
+}
+
+/**
  * Firebase error response
  */
 export interface FirebaseErrorResponse {

@@ -8,6 +8,7 @@ import * as authHandler from './auth-handler.js';
 import { parseFirebaseError } from '../shared/utils.js';
 import { DEFAULT_API_PATH, DEFAULT_CALLBACK_PATH, LOCAL_ENDPOINTS } from '../shared/constants.js';
 import { matchRoute, matchesAnyRoute } from '../shared/utils.js';
+import { processAuthCallback } from './auth-callback.js';
 
 /**
  * Create auth handle for SvelteKit hooks
@@ -209,36 +210,16 @@ async function handleAuthCallback(
 	event: RequestEvent,
 	config: AuthHandleConfig
 ): Promise<Response> {
-	const { searchParams } = event.url;
-	const mode = searchParams.get('mode');
-	const oobCode = searchParams.get('oobCode');
-	const continueUrl = searchParams.get('continueUrl');
+	const callbackConfig = config.callbackConfig || {
+		firebaseApiKey: config.firebaseApiKey,
+		successUrl: '/',
+		errorUrl: '/auth/error',
+		resetPasswordUrl: '/auth/reset-password',
+		recoverEmailUrl: '/auth/recover-email',
+		verifyEmailUrl: '/auth/verify-email'
+	};
 
-	// This is a basic callback handler
-	// In a real application, you might want to render a custom page
-	// or redirect to a specific URL based on the mode
-
-	return new Response(
-		`
-		<!DOCTYPE html>
-		<html>
-		<head>
-			<title>Authentication Action</title>
-		</head>
-		<body>
-			<h1>Authentication Action</h1>
-			<p>Mode: ${mode}</p>
-			<p>Processing...</p>
-			${continueUrl ? `<p><a href="${continueUrl}">Continue</a></p>` : ''}
-		</body>
-		</html>
-		`,
-		{
-			headers: {
-				'Content-Type': 'text/html'
-			}
-		}
-	);
+	return processAuthCallback(event.url, callbackConfig);
 }
 
 /**

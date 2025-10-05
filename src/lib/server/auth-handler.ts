@@ -19,7 +19,9 @@ import type {
 	ConfirmPasswordResetRequest,
 	ConfirmPasswordResetResponse,
 	SendEmailVerificationRequest,
-	SendEmailVerificationResponse
+	SendEmailVerificationResponse,
+	VerifyOobCodeRequest,
+	VerifyOobCodeResponse
 } from '../shared/types.js';
 import { buildFirebaseAuthUrl, buildFirebaseTokenUrl, parseFirebaseError } from '../shared/utils.js';
 import { FIREBASE_ENDPOINTS } from '../shared/constants.js';
@@ -213,5 +215,20 @@ export async function confirmEmailVerification(
 	};
 
 	return firebaseRequest<UpdateProfileResponse>(url, body);
+}
+
+/**
+ * Verify OOB code (for checking validity before performing action)
+ */
+export async function verifyOobCode(
+	apiKey: string,
+	oobCode: string
+): Promise<VerifyOobCodeResponse> {
+	const url = buildFirebaseAuthUrl(FIREBASE_ENDPOINTS.VERIFY_OOB_CODE, apiKey);
+	const body: VerifyOobCodeRequest = {
+		oobCode
+	};
+
+	return firebaseRequest<VerifyOobCodeResponse>(url, body);
 }
 

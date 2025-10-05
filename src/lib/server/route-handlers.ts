@@ -3,9 +3,10 @@
  */
 
 import { json, type RequestHandler, type RequestEvent } from '@sveltejs/kit';
-import type { RouteHandlerConfig } from './types.js';
+import type { RouteHandlerConfig, AuthCallbackConfig } from './types.js';
 import * as authHandler from './auth-handler.js';
 import { parseFirebaseError } from '../shared/utils.js';
+import { processAuthCallback } from './auth-callback.js';
 
 type RequestParams = Record<string, any>;
 
@@ -184,5 +185,15 @@ export function handleVerifyEmailConfirm(config: RouteHandlerConfig): RequestHan
 		body: ['oobCode'],
 		params: ['oobCode']
 	});
+}
+
+/**
+ * Create an auth callback handler for SvelteKit routes
+ * This can be used in a +server.ts file to handle Firebase Auth callbacks
+ */
+export function handleAuthCallback(config: AuthCallbackConfig): RequestHandler {
+	return async ({ url }: RequestEvent) => {
+		return processAuthCallback(url, config);
+	};
 }
 

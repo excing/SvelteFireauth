@@ -17,7 +17,8 @@ export {
 	handlePasswordReset,
 	handlePasswordConfirm,
 	handleVerifyEmail,
-	handleVerifyEmailConfirm
+	handleVerifyEmailConfirm,
+	handleAuthCallback
 } from './route-handlers.js';
 
 // Auth handler functions (for advanced use cases)
@@ -31,12 +32,17 @@ export {
 	sendPasswordResetEmail,
 	confirmPasswordReset,
 	sendEmailVerification,
-	confirmEmailVerification
+	confirmEmailVerification,
+	verifyOobCode
 } from './auth-handler.js';
+
+// Auth callback processing (for custom implementations)
+export { processAuthCallback } from './auth-callback.js';
 
 // Types
 export type {
 	AuthHandleConfig,
+	AuthCallbackConfig,
 	RouteHandlerConfig,
 	AuthGuardConfig,
 	SessionConfig,

@@ -20,7 +20,8 @@ export const FIREBASE_ENDPOINTS = {
 	DELETE_USER: '/accounts:delete',
 	SEND_OOB_CODE: '/accounts:sendOobCode',
 	RESET_PASSWORD: '/accounts:resetPassword',
-	VERIFY_EMAIL: '/accounts:update'
+	VERIFY_EMAIL: '/accounts:update',
+	VERIFY_OOB_CODE: '/accounts:resetPassword'
 } as const;
 
 /**
